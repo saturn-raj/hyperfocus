@@ -5,6 +5,9 @@ export function useStore() {
   return useSyncExternalStore(workspace.subscribe, workspace.getState);
 }
 export const {
+  saveOnboardingDraft,
+  completeOnboarding,
+  restartOnboarding,
   getState,
   getStartupError,
   commit,

@@ -10,12 +10,14 @@ import {
 import { createState } from '../domain/seed';
 import { canSchedule, remaining } from '../domain/planning';
 import type { Repository } from './ports';
+import { buildOnboardingPlan } from '../domain/onboarding';
+import { onboardingDraftSchema, type OnboardingDraft } from '../domain/model';
 
 export function createWorkspaceStore(repository: Repository) {
   let startupError = '';
   let state: State;
   try {
-    state = repository.load() ?? createState();
+    state = repository.load() ?? createState(false);
   } catch {
     state = createState(false);
     startupError =
@@ -192,6 +194,20 @@ export function createWorkspaceStore(repository: Repository) {
       ],
     });
   }
+  function saveOnboardingDraft(draft: OnboardingDraft) {
+    commit({
+      ...state,
+      onboarding: { ...state.onboarding, draft: onboardingDraftSchema.parse(draft) },
+    });
+  }
+  function completeOnboarding(draft: OnboardingDraft) {
+    if (state.onboarding.completedAt !== null)
+      throw new Error('Your season is already set up. Revisit setup from Settings to plan again.');
+    commit(buildOnboardingPlan(state, draft));
+  }
+  function restartOnboarding() {
+    commit({ ...state, onboarding: { completedAt: null, draft: null } });
+  }
   function reload() {
     try {
       const next = repository.load();
@@ -206,6 +222,9 @@ export function createWorkspaceStore(repository: Repository) {
     }
   }
   return {
+    saveOnboardingDraft,
+    completeOnboarding,
+    restartOnboarding,
     subscribe,
     getState,
     getStartupError,

@@ -33,6 +33,23 @@ export function Season({ notify }: { notify: (s: string) => void }) {
           <Plus size={17} /> New goal
         </button>
       </div>
+      {s.onboarding.draft?.commitment && s.onboarding.completedAt ? (
+        <section className="season-commitment">
+          <Flag size={21} />
+          <div>
+            <div className="eyebrow">YOUR SEASON STARTS WITH A PROMISE</div>
+            <p>{s.onboarding.draft.commitment}</p>
+            <small>
+              Signed {s.onboarding.draft.signature} ·{' '}
+              {new Date(s.onboarding.completedAt).toLocaleDateString(undefined, {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </small>
+          </div>
+        </section>
+      ) : null}
       <section className="season-banner">
         <div>
           <span className="eyebrow">

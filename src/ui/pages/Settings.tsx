@@ -1,5 +1,11 @@
 import { Download, Upload, ShieldCheck, CalendarDays, ExternalLink } from 'lucide-react';
-import { useStore, updateSettings, replaceState, getStartupError } from '../useWorkspace';
+import {
+  useStore,
+  updateSettings,
+  replaceState,
+  getStartupError,
+  restartOnboarding,
+} from '../useWorkspace';
 import { createState } from '../../domain/seed';
 import { download, parseBackup, STORAGE_KEY } from '../../infrastructure/storage';
 import { exportCalendar } from '../../infrastructure/calendar';
@@ -26,6 +32,15 @@ export function Settings({ notify }: { notify: (s: string) => void }) {
       <div className="settings-grid">
         <section className="surface">
           <h2>The essentials</h2>
+          <button
+            className="text-button"
+            onClick={() => {
+              if (confirm('Revisit season setup? Existing goals and history will be kept.'))
+                run(restartOnboarding);
+            }}
+          >
+            Revisit season setup <ExternalLink size={14} />
+          </button>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -176,7 +191,12 @@ export function Settings({ notify }: { notify: (s: string) => void }) {
               className="button"
               onClick={() => {
                 if (confirm('Erase all local data and start empty? Export a backup first.'))
-                  run(() => replaceState(createState(false)));
+                  run(() =>
+                    replaceState({
+                      ...createState(false),
+                      onboarding: { completedAt: Date.now(), draft: null },
+                    }),
+                  );
               }}
             >
               Start empty

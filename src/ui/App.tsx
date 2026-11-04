@@ -18,6 +18,9 @@ import { localDate } from '../domain/model';
 import { Planner } from './pages/Planner';
 import { Modal } from './components/Modal';
 import { TaskEditor } from './components/Editors';
+const Onboarding = lazy(() =>
+  import('./pages/Onboarding').then((m) => ({ default: m.Onboarding })),
+);
 const Season = lazy(() => import('./pages/Season').then((m) => ({ default: m.Season }))),
   Focus = lazy(() => import('./pages/Focus').then((m) => ({ default: m.Focus }))),
   Compass = lazy(() => import('./pages/Compass').then((m) => ({ default: m.Compass }))),
@@ -53,6 +56,7 @@ export function App() {
   }, []);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if (!s.onboarding.completedAt) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setSearch((v) => !v);
@@ -60,7 +64,7 @@ export function App() {
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, []);
+  }, [s.onboarding.completedAt]);
   useEffect(() => {
     if (!message) return;
     const t = setTimeout(() => setMessage(''), 7000);
@@ -93,6 +97,19 @@ export function App() {
     const interval = setInterval(send, 2000);
     return () => clearInterval(interval);
   }, [s.timer, s.settings.blockedDomains]);
+  if (!s.onboarding.completedAt && !getStartupError()) {
+    return (
+      <Suspense
+        fallback={
+          <div className="empty-state" role="status">
+            Getting your season ready…
+          </div>
+        }
+      >
+        <Onboarding onComplete={() => navigate('season')} />
+      </Suspense>
+    );
+  }
   const notify = (text: string) => setMessage(text);
   const results = [
     ...s.goals.map((g) => ({ id: g.id, title: g.title, kind: 'Goal', page: 'season' as Page })),

@@ -14,6 +14,12 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('workspace commands', () => {
+  it('starts an untouched browser with onboarding and no example goals or blocks', () => {
+    const store = createWorkspaceStore({ load: () => null, save: () => {} });
+    expect(store.getState().goals).toEqual([]);
+    expect(store.getState().blocks).toEqual([]);
+    expect(store.getState().onboarding.completedAt).toBeNull();
+  });
   it('publishes only after persistence succeeds and keeps the old snapshot on quota failure', () => {
     const { store, repository } = setup();
     const before = store.getState(),

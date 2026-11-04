@@ -60,9 +60,38 @@ export const timerSchema = z
     runningSince: z.number().finite().nonnegative().nullable(),
   })
   .refine((t) => t.remainingSeconds <= t.durationSeconds, 'Timer remaining exceeds duration');
+export const onboardingGoalSchema = goalSchema.extend({
+  title: z.string().max(300),
+  success: z.string().max(300),
+  firstAction: z.string().max(300),
+  firstDuration: z.number().int().min(5).max(240),
+});
+export const onboardingDraftSchema = z.object({
+  step: z.number().int().min(0).max(6),
+  name: z.string().max(60),
+  seasonTitle: z.string().max(300),
+  start: dateKeySchema,
+  lengthDays: z.number().int().min(7).max(366),
+  brainDump: z.string().max(6000),
+  goals: z.array(onboardingGoalSchema).max(5),
+  weeklyCapacity: z.number().int().min(30).max(2400),
+  commitment: z.string().max(2000),
+  signature: z.string().max(60),
+  firstBlock: z
+    .object({ date: dateKeySchema, start: z.number().int().min(0).max(1435) })
+    .nullable(),
+});
+export type OnboardingDraft = z.infer<typeof onboardingDraftSchema>;
+export type OnboardingGoal = z.infer<typeof onboardingGoalSchema>;
 export const stateSchema = z
   .object({
     version: z.literal(1),
+    onboarding: z
+      .object({
+        completedAt: z.number().finite().nonnegative().nullable(),
+        draft: onboardingDraftSchema.nullable(),
+      })
+      .default({ completedAt: null, draft: null }),
     season: z
       .object({ title: text, start: dateKeySchema, end: dateKeySchema })
       .refine((s) => s.end >= s.start, 'Season must end after it starts'),

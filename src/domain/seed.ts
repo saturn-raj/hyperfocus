@@ -4,6 +4,7 @@ export function createState(demo = true): State {
     start = monday(today);
   return {
     version: 1,
+    onboarding: { completedAt: demo ? Date.now() : null, draft: null },
     season: { title: 'A season of meaningful progress', start, end: addDays(start, 83) },
     goals: demo
       ? [

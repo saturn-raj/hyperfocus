@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { createState } from '../src/domain/seed';
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((seed) => {
+    if (!localStorage.getItem('hyperfocus:v1'))
+      localStorage.setItem('hyperfocus:v1', JSON.stringify(seed));
+  }, createState(true));
+});
 test('goals, tasks, calendar, focus and reflection survive reloads', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
