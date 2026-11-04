@@ -1,0 +1,14 @@
+# Hyperfocus design
+
+| Decision               | Reason                                                                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope                  | Independent implementation of the publicly documented goal → plan → focus → reflect loop. Treat unverified private behavior as unknown.                                                                         |
+| Local-first static app | No account or recurring infrastructure needed; users can run and inspect the whole system. Storage and calendar boundaries support later adapters.                                                              |
+| Alternatives           | A server-backed clone adds accounts, sync and secret management before the core loop is useful. A timer-only app misses goal alignment. Choose a complete local planning loop with explicit integration limits. |
+| Stack                  | React + TypeScript + Vite, Zod boundaries, Radix accessible dialogs, Lucide icons, local font packages. No unnecessary state framework or backend.                                                              |
+| Interface              | Cool neutral workspace with blue action color, stable sidebar, goal-colored calendar blocks, compact planning rail and unobtrusive suggestions. Day view and bottom navigation support narrow screens.          |
+| State                  | Validated document, atomic persist-before-publish commands, explicit export/import, preserved corruption recovery.                                                                                              |
+| Focus                  | Timestamp-derived persisted timer, separate session completion and task completion, generated noise.                                                                                                            |
+| Blocking               | Independently installable Chromium extension, validated fixed origins and short heartbeat lease. No claim of native blocking.                                                                                   |
+| Testing                | Test domain invariants and complete user workflows across reloads at desktop and mobile sizes. Document external capabilities requiring manual checks.                                                          |
+| Distribution           | Public GitHub repository `saturn-raj/hyperfocus`, as authorized by the user, with MIT license, CI and contribution guidance.                                                                                    |

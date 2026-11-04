@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Hyperfocus Companion",
+  "version": "0.1.0",
+  "description": "Block distracting websites during your local Hyperfocus sessions.",
+  "permissions": ["declarativeNetRequest", "storage", "alarms"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [
+    { "matches": ["http://localhost/*", "http://127.0.0.1/*"], "js": ["bridge.js"] }
+  ],
+  "action": { "default_title": "Hyperfocus: local session blocker" }
+}
