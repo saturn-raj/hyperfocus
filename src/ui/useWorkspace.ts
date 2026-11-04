@@ -5,6 +5,10 @@ export function useStore() {
   return useSyncExternalStore(workspace.subscribe, workspace.getState);
 }
 export const {
+  cancelOnboarding,
+  saveSupportArea,
+  deleteSupportArea,
+  signCommitment,
   saveOnboardingDraft,
   completeOnboarding,
   restartOnboarding,
@@ -26,3 +30,5 @@ export const {
   discardFocus,
   addReflection,
 } = workspace;
+
+export { planning } from '../bootstrap';

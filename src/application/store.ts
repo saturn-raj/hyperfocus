@@ -6,11 +6,12 @@ import {
   type Goal,
   type Task,
   type Block,
+  type SupportArea,
 } from '../domain/model';
 import { createState } from '../domain/seed';
 import { canSchedule, remaining } from '../domain/planning';
 import type { Repository } from './ports';
-import { buildOnboardingPlan } from '../domain/onboarding';
+import { buildOnboardingPlan, createOnboardingDraft } from '../domain/onboarding';
 import { onboardingDraftSchema, type OnboardingDraft } from '../domain/model';
 
 export function createWorkspaceStore(repository: Repository) {
@@ -129,6 +130,7 @@ export function createWorkspaceStore(repository: Repository) {
     duration: number,
     goalId: string | null,
     taskId: string | null,
+    areaId: string | null = null,
   ) {
     if (state.timer) throw new Error('Finish or discard your current session first.');
     const now = Date.now();
@@ -139,6 +141,7 @@ export function createWorkspaceStore(repository: Repository) {
         title,
         goalId,
         taskId,
+        areaId,
         durationSeconds: duration * 60,
         remainingSeconds: duration * 60,
         startedAt: now,
@@ -173,6 +176,7 @@ export function createWorkspaceStore(repository: Repository) {
           title: t.title,
           goalId: t.goalId,
           taskId: t.taskId,
+          areaId: t.areaId ?? null,
           startedAt: t.startedAt,
           endedAt: Date.now(),
           minutes,
@@ -201,12 +205,51 @@ export function createWorkspaceStore(repository: Repository) {
     });
   }
   function completeOnboarding(draft: OnboardingDraft) {
-    if (state.onboarding.completedAt !== null)
-      throw new Error('Your season is already set up. Revisit setup from Settings to plan again.');
     commit(buildOnboardingPlan(state, draft));
   }
   function restartOnboarding() {
-    commit({ ...state, onboarding: { completedAt: null, draft: null } });
+    commit({ ...state, onboarding: { ...state.onboarding, draft: createOnboardingDraft(state) } });
+  }
+  function cancelOnboarding() {
+    if (state.onboarding.completedAt === null)
+      throw new Error('Complete your first season before opening the workspace.');
+    commit({ ...state, onboarding: { ...state.onboarding, draft: null } });
+  }
+  function saveSupportArea(area: SupportArea) {
+    commit({
+      ...state,
+      supportAreas: state.supportAreas.some((a) => a.id === area.id)
+        ? state.supportAreas.map((a) => (a.id === area.id ? area : a))
+        : [...state.supportAreas, area],
+    });
+  }
+  function deleteSupportArea(id: string) {
+    commit({
+      ...state,
+      supportAreas: state.supportAreas.filter((a) => a.id !== id),
+      tasks: state.tasks.map((t) => (t.areaId === id ? { ...t, areaId: null } : t)),
+      blocks: state.blocks.map((b) => (b.areaId === id ? { ...b, areaId: null } : b)),
+      sessions: state.sessions.map((x) => (x.areaId === id ? { ...x, areaId: null } : x)),
+      timer: state.timer?.areaId === id ? { ...state.timer, areaId: null } : state.timer,
+    });
+  }
+  function signCommitment(text: string, signature: string) {
+    commit({
+      ...state,
+      onboarding: {
+        ...state.onboarding,
+        commitments: [
+          ...state.onboarding.commitments,
+          {
+            id: uid(),
+            text: text.trim(),
+            signature: signature.trim(),
+            signedAt: Date.now(),
+            revision: (state.onboarding.commitments.at(-1)?.revision ?? 0) + 1,
+          },
+        ],
+      },
+    });
   }
   function reload() {
     try {
@@ -222,6 +265,10 @@ export function createWorkspaceStore(repository: Repository) {
     }
   }
   return {
+    cancelOnboarding,
+    saveSupportArea,
+    deleteSupportArea,
+    signCommitment,
     saveOnboardingDraft,
     completeOnboarding,
     restartOnboarding,

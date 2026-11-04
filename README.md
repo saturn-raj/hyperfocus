@@ -1,40 +1,45 @@
 # Hyperfocus
 
-An independent, open-source workspace for turning seasonal goals into planned time and focused work. MIT licensed. Local-first. No account, subscription, telemetry, or API key.
+An independent, MIT-licensed workspace for goals, time, and focused work. Local-first, with a private guided planner and an optional connected AI coach.
 
-![Hyperfocus first-run onboarding](docs/screenshots/onboarding-desktop.png)
+![Season plan review](docs/screenshots/season-review-desktop.png)
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:5180**. Requires Node.js 22.12 or newer. Your first visit opens guided season setup: introduction, season dates, brain dump, goal questions, a realistic time budget, plan review, and a signed commitment. Answers save as you go. Completing setup opens your season, with your goals and first actions ready. The example workspace is an explicit choice on the welcome screen.
+Open **http://127.0.0.1:5180**. Requires Node.js **22.12+**. New workspaces start with onboarding. Example data is an explicit choice.
 
-| Area              | Included                                                                                                                                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Onboarding        | Resumable first-run flow, goal reasons and finish lines, priority and capacity checks, optional first focus block, and a signed commitment. Revisit from Settings without deleting existing work. |
-| Seasons           | Editable dates, ranked goals, weekly time budgets, reasons, and checkable milestones                                                                                                              |
-| Planning          | Task CRUD, completion, day/week calendar, drag tasks to schedule, drag blocks to move, precise block editor, overlap prevention                                                                   |
-| Week draft        | Deterministic proposal from unfinished tasks, free weekday work hours, review and remove suggestions before applying                                                                              |
-| Focus             | Persistent countdown, pause/resume, session ratings, generated brown noise, optional completion tone                                                                                              |
-| Compass           | Actual focus minutes, 7-day chart, goal time coverage, daily reflections and energy ratings                                                                                                       |
-| Data              | Versioned and validated local storage, JSON backup/restore, iCalendar export, dark mode, search                                                                                                   |
-| Blocking          | Optional unpacked [Chrome companion](extension/README.md) for website navigation during focus sessions                                                                                            |
-| Architecture      | [Domain, application, infrastructure, UI boundaries](docs/architecture.md); no backend required                                                                                                   |
-| Research          | [Sources, observed behavior and parity limits](docs/research.md)                                                                                                                                  |
-| Privacy           | Data lives in this browser profile. Fonts and audio are local. Browser storage is not encrypted. Export backups before clearing site data or changing devices.                                    |
-| Multi-tab use     | Changes propagate through storage events. Concurrent edits use last-write-wins. Use one planner tab for active sessions and blocking.                                                             |
-| AI / integrations | Suggestions use visible local rules. Conversational AI, OAuth calendar sync, Slack, native apps and cross-device sync are not implemented.                                                        |
+| Area          | Included                                                                                                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Onboarding    | Season dates → free-form narrative → relevant follow-up questions one at a time → editable plan → editable commitment and signature. Resumes at the current question.                                                  |
+| Goal review   | Add, remove and edit outcomes; choose a core priority; adjust weekly time, finish lines and first actions. Original answers remain separate from plan edits.                                                           |
+| Support areas | Distinct ongoing areas such as health, home and relationships. Area tasks can be scheduled and focused without becoming seasonal goals.                                                                                |
+| Coaching      | Private guided mode uses explicit local heuristics. Connected mode uses your server-configured OpenAI-compatible provider or local Ollama. Nothing is sent to a provider until you choose connected mode and continue. |
+| Commitments   | Accepted signatures have timestamps and revision history. Re-entering setup preserves the current season; cancelling returns to it. Editing and re-signing creates a new record.                                       |
+| Planning      | Task CRUD, explicit completion, day/week calendar, drag scheduling, exact block editing, conflict prevention and reviewable rule-based week drafts.                                                                    |
+| Focus         | Persistent countdown, pause/resume, ratings, locally generated brown noise and optional completion sound.                                                                                                              |
+| Compass       | Recorded focus minutes, weekly target coverage, daily reflections and energy ratings.                                                                                                                                  |
+| Data          | Validated browser storage, old-backup migration, JSON backup/restore, iCalendar export, saved planning notes, dark mode and search.                                                                                    |
+| Blocking      | Optional unpacked [Chrome companion](extension/README.md). Website navigation only; native apps and other devices are outside its scope.                                                                               |
+| Architecture  | [Domain, application ports, adapters and UI](docs/architecture.md). Static hosting works in private guided mode; connected coaching needs the local server.                                                            |
+| Research      | [REA evidence and limits](docs/research/rea-superfocus.md). Public artifacts were inspected; private Superfocus prompts and backend algorithms remain unknown.                                                         |
+| Privacy       | Browser data and backups are unencrypted. Local fonts/audio, no telemetry. Connected mode sends the narrative, answers and reviewed plan to the provider you configure.                                                |
+| Not included  | OAuth calendar sync, Slack, native mobile/desktop apps, automatic app tracking, cloud accounts and cross-device sync.                                                                                                  |
 
 ```sh
-npm run check                    # ESLint, domain/storage tests, TypeScript, production build
+npm run check                    # Lint, unit tests, TypeScript, production build
 npx playwright install chromium
-npm run test:e2e                 # Desktop and mobile Chromium workflows
+npm run test:e2e                 # Desktop + mobile workflows
 npm run build
-npm run preview                 # Production build on port 4173
+npm start                        # Local production server on 127.0.0.1:5180
 ```
 
-Deploy `dist/` to any static host over HTTPS. Keep a consistent origin because storage is origin-specific. The browser extension trusts only the documented localhost origins until explicitly configured for your deployment. No service worker is installed; first load and uncached page chunks need the static host available.
+Stop the dev server before `npm start`, since both use port 5180. For private static hosting, deploy `dist/`; the optional API is not included in static assets. No service worker is installed, so uncached application files need the host available.
 
-Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md). Hyperfocus is not affiliated with Superfocus, Ali Abdaal, or SuperOS. No proprietary source, artwork, or branding is included.
+To use connected coaching, copy `.env.example` to `.env`, set `COACH_BASE_URL`, `COACH_MODEL`, and, for remote providers, `COACH_API_KEY`, then restart the server. Example local Ollama base: `http://127.0.0.1:11434/v1`, with a model already installed on your machine. Credentials stay server-side. The server binds to loopback and rejects cross-origin coaching calls; it is a local single-user service. [Configuration and limits](docs/coaching.md).
+
+Data belongs to the current browser origin. Keep that origin stable and export backups before changing devices or clearing site data. Concurrent tabs use last-write-wins; use one tab for active focus and blocking.
+
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md). Hyperfocus is not affiliated with Superfocus, Ali Abdaal, or SuperOS. Proprietary application code, personal onboarding answers, and captured artifacts are not included in this repository.

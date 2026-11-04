@@ -4,7 +4,29 @@ export function createState(demo = true): State {
     start = monday(today);
   return {
     version: 1,
-    onboarding: { completedAt: demo ? Date.now() : null, draft: null },
+    onboarding: {
+      completedAt: demo ? Date.now() : null,
+      draft: null,
+      commitments: [],
+      acceptedProposalIds: [],
+      history: [],
+    },
+    supportAreas: demo
+      ? [
+          {
+            id: 'area-health',
+            title: 'Health & Fitness',
+            description: 'Keep space for movement, recovery, and everyday health.',
+            color: 'green',
+          },
+          {
+            id: 'area-home',
+            title: 'Home & Relationships',
+            description: 'Look after home and make time for the people who matter.',
+            color: 'violet',
+          },
+        ]
+      : [],
     season: { title: 'A season of meaningful progress', start, end: addDays(start, 83) },
     goals: demo
       ? [
@@ -35,7 +57,7 @@ export function createState(demo = true): State {
             title: 'Make space to learn',
             why: 'Stay curious. Read, reflect, and put a new idea into practice each week.',
             color: 'orange',
-            priority: 'support',
+            priority: 'secondary',
             weeklyMinutes: 120,
             milestones: [],
           },
@@ -113,7 +135,7 @@ export function createState(demo = true): State {
     timer: null,
     settings: {
       name: '',
-      theme: 'light',
+      theme: 'dark',
       sound: false,
       blockedDomains: ['youtube.com', 'reddit.com', 'x.com', 'instagram.com'],
     },

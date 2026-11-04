@@ -69,7 +69,9 @@ export function GoalEditor({ goal, onClose }: { goal?: Goal; onClose: () => void
             >
               <option value="core">Core focus</option>
               <option value="secondary">Secondary focus</option>
-              <option value="support">Support area</option>
+              {g.priority === 'support' ? (
+                <option value="support">Supporting goal (legacy)</option>
+              ) : null}
             </select>
           </label>
           <label>
@@ -173,7 +175,14 @@ export function GoalEditor({ goal, onClose }: { goal?: Goal; onClose: () => void
 export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void }) {
   const s = useStore();
   const [t, setT] = useState<Task>(
-    task ?? { id: uid(), title: '', goalId: s.goals[0]?.id ?? null, duration: 30, done: false },
+    task ?? {
+      id: uid(),
+      title: '',
+      goalId: s.goals[0]?.id ?? null,
+      areaId: null,
+      duration: 30,
+      done: false,
+    },
   );
   const [error, setError] = useState('');
   return (
@@ -200,7 +209,11 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
             onChange={(e) => setT({ ...t, title: e.target.value })}
           />
         </label>
-        <GoalSelect value={t.goalId} onChange={(goalId) => setT({ ...t, goalId })} />
+        <GoalSelect
+          value={t.goalId}
+          areaId={t.areaId}
+          onTargetChange={(target) => setT({ ...t, ...target })}
+        />
         <label>
           Estimated minutes
           <input
@@ -242,24 +255,55 @@ export function TaskEditor({ task, onClose }: { task?: Task; onClose: () => void
     </Modal>
   );
 }
+export interface WorkTarget {
+  goalId: string | null;
+  areaId: string | null;
+}
 export function GoalSelect({
   value,
+  areaId,
   onChange,
+  onTargetChange,
 }: {
   value: string | null;
-  onChange: (value: string | null) => void;
+  areaId?: string | null;
+  onChange?: (value: string | null) => void;
+  onTargetChange?: (target: WorkTarget) => void;
 }) {
   const s = useStore();
+  const selected = areaId ? `area:${areaId}` : value ? `goal:${value}` : '';
   return (
     <label>
-      Connected goal
-      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-        <option value="">Personal / no goal</option>
-        {s.goals.map((g) => (
-          <option key={g.id} value={g.id}>
-            {g.title}
-          </option>
-        ))}
+      Connected goal or support area
+      <select
+        aria-label="Connected goal"
+        value={selected}
+        onChange={(event) => {
+          const selection = event.target.value;
+          const target: WorkTarget = selection.startsWith('area:')
+            ? { goalId: null, areaId: selection.slice(5) }
+            : { goalId: selection.startsWith('goal:') ? selection.slice(5) : null, areaId: null };
+          if (onTargetChange) onTargetChange(target);
+          else onChange?.(target.goalId);
+        }}
+      >
+        <option value="">Personal / no goal or support area</option>
+        <optgroup label="Seasonal goals">
+          {s.goals.map((goal) => (
+            <option key={goal.id} value={`goal:${goal.id}`}>
+              {goal.title}
+            </option>
+          ))}
+        </optgroup>
+        {onTargetChange && s.supportAreas.length ? (
+          <optgroup label="Support areas">
+            {s.supportAreas.map((area) => (
+              <option key={area.id} value={`area:${area.id}`}>
+                {area.title}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
       </select>
     </label>
   );
@@ -283,6 +327,7 @@ export function BlockEditor({
       title: task?.title ?? '',
       taskId: task?.id ?? null,
       goalId: task?.goalId ?? null,
+      areaId: task?.areaId ?? null,
       date: date ?? localDate(),
       start: start ?? 540,
       duration: task?.duration ?? 60,
@@ -317,7 +362,11 @@ export function BlockEditor({
             onChange={(e) => setB({ ...b, title: e.target.value })}
           />
         </label>
-        <GoalSelect value={b.goalId} onChange={(goalId) => setB({ ...b, goalId })} />
+        <GoalSelect
+          value={b.goalId}
+          areaId={b.areaId}
+          onTargetChange={(target) => setB({ ...b, ...target })}
+        />
         <div className="form-row">
           <label>
             Date

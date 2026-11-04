@@ -17,5 +17,5 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["src", "vite.config.ts", "tests", "playwright.config.ts"]
+  "include": ["src", "vite.config.ts", "tests", "playwright.config.ts", "server"]
 }

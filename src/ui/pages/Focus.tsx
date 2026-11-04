@@ -10,14 +10,14 @@ import {
 } from '../useWorkspace';
 import { remaining } from '../../domain/planning';
 import { hours } from '../../domain/model';
-import { GoalSelect } from '../components/Editors';
+import { GoalSelect, type WorkTarget } from '../components/Editors';
 import { Modal } from '../components/Modal';
 export function Focus({ notify }: { notify: (s: string) => void }) {
   const s = useStore();
   const [now, setNow] = useState(Date.now),
     [title, setTitle] = useState(''),
     [duration, setDuration] = useState(25),
-    [goalId, setGoalId] = useState<string | null>(s.goals[0]?.id ?? null),
+    [target, setTarget] = useState<WorkTarget>({ goalId: s.goals[0]?.id ?? null, areaId: null }),
     [taskId, setTaskId] = useState<string | null>(null),
     [quality, setQuality] = useState(4),
     [review, setReview] = useState(false),
@@ -102,7 +102,18 @@ export function Focus({ notify }: { notify: (s: string) => void }) {
                   : 'Taking a breather'
               : 'A little space for deep work'}
           </div>
-          {s.timer ? <h2>{s.timer.title}</h2> : <h2>What deserves your attention?</h2>}
+          {s.timer ? (
+            <>
+              <h2>{s.timer.title}</h2>
+              {s.timer.areaId ? (
+                <p className="muted">
+                  {s.supportAreas.find((area) => area.id === s.timer?.areaId)?.title}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <h2>What deserves your attention?</h2>
+          )}
           <div
             className={`timer-dial ${s.timer ? 'running' : ''}`}
             style={
@@ -145,7 +156,7 @@ export function Focus({ notify }: { notify: (s: string) => void }) {
               className="focus-form"
               onSubmit={(e) => {
                 e.preventDefault();
-                run(() => startFocus(title.trim(), duration, goalId, taskId));
+                run(() => startFocus(title.trim(), duration, target.goalId, taskId, target.areaId));
               }}
             >
               <label>
@@ -159,7 +170,7 @@ export function Focus({ notify }: { notify: (s: string) => void }) {
                     setTitle(task?.title ?? '');
                     if (task) {
                       setDuration(task.duration);
-                      setGoalId(task.goalId);
+                      setTarget({ goalId: task.goalId, areaId: task.areaId ?? null });
                     }
                   }}
                 >
@@ -184,7 +195,14 @@ export function Focus({ notify }: { notify: (s: string) => void }) {
                 />
               </label>
               <div className="form-row">
-                <GoalSelect value={goalId} onChange={setGoalId} />
+                <GoalSelect
+                  value={target.goalId}
+                  areaId={target.areaId}
+                  onTargetChange={(selection) => {
+                    setTarget(selection);
+                    setTaskId(null);
+                  }}
+                />
                 <label>
                   Minutes
                   <input
@@ -255,7 +273,17 @@ export function Focus({ notify }: { notify: (s: string) => void }) {
               .reverse()
               .map((session) => (
                 <div className="recent-session" key={session.id}>
-                  <span>{session.title}</span>
+                  <span>
+                    {session.title}
+                    {session.areaId ? (
+                      <small>
+                        {' '}
+                        ·{' '}
+                        {s.supportAreas.find((area) => area.id === session.areaId)?.title ??
+                          'Support area'}
+                      </small>
+                    ) : null}
+                  </span>
                   <strong>{hours(session.minutes)}</strong>
                 </div>
               ))}

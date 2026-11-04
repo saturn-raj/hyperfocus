@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run build",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "start": "node --env-file-if-exists=.env --experimental-strip-types server/main.ts"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",

@@ -17,9 +17,18 @@ export const goalSchema = z.object({
   weeklyMinutes: z.number().int().min(30).max(2400),
   milestones: z.array(z.object({ id, title: text, done: z.boolean() })).max(100),
 });
+export const supportAreaSchema = z.object({
+  id,
+  title: text,
+  description: z.string().max(2000),
+  color: z.enum(['blue', 'green', 'orange', 'violet']),
+});
+export type SupportArea = z.infer<typeof supportAreaSchema>;
+
 export const taskSchema = z.object({
   id,
   goalId: id.nullable(),
+  areaId: id.nullable().optional(),
   title: text,
   duration: z.number().int().min(5).max(480),
   done: z.boolean(),
@@ -29,6 +38,7 @@ export const blockSchema = z
     id,
     taskId: id.nullable(),
     goalId: id.nullable(),
+    areaId: id.nullable().optional(),
     title: text,
     date: dateKeySchema,
     start: z.number().int().min(0).max(1435),
@@ -40,6 +50,7 @@ export const sessionSchema = z
   .object({
     id,
     goalId: id.nullable(),
+    areaId: id.nullable().optional(),
     taskId: id.nullable(),
     title: text,
     startedAt: z.number().finite().nonnegative(),
@@ -52,6 +63,7 @@ export const timerSchema = z
   .object({
     id,
     goalId: id.nullable(),
+    areaId: id.nullable().optional(),
     taskId: id.nullable(),
     title: text,
     startedAt: z.number().finite().nonnegative(),
@@ -66,14 +78,48 @@ export const onboardingGoalSchema = goalSchema.extend({
   firstAction: z.string().max(300),
   firstDuration: z.number().int().min(5).max(240),
 });
+export const seasonCommitmentSchema = z.object({
+  id,
+  text: z.string().trim().min(1).max(2000),
+  signature: z.string().trim().min(1).max(60),
+  signedAt: z.number().finite().nonnegative(),
+  revision: z.number().int().min(1),
+});
+export type SeasonCommitment = z.infer<typeof seasonCommitmentSchema>;
+
 export const onboardingDraftSchema = z.object({
+  revisionId: id.default('legacy'),
+  coachMode: z.enum(['guided', 'connected']).default('guided'),
+  questions: z
+    .array(
+      z.object({
+        id,
+        prompt: z.string().trim().min(1).max(2000),
+        options: z.array(z.string().trim().min(1).max(500)).max(10).optional(),
+      }),
+    )
+    .max(30)
+    .default([]),
+  answers: z
+    .array(
+      z.object({
+        questionId: id,
+        prompt: z.string().trim().min(1).max(2000),
+        answer: z.string().max(6000),
+      }),
+    )
+    .max(30)
+    .default([]),
+  questionIndex: z.number().int().min(0).max(30).default(0),
+  proposedSupportAreas: z.array(supportAreaSchema).max(100).default([]),
+  proposalGenerated: z.boolean().default(false),
   step: z.number().int().min(0).max(6),
   name: z.string().max(60),
   seasonTitle: z.string().max(300),
   start: dateKeySchema,
   lengthDays: z.number().int().min(7).max(366),
   brainDump: z.string().max(6000),
-  goals: z.array(onboardingGoalSchema).max(5),
+  goals: z.array(onboardingGoalSchema).max(10),
   weeklyCapacity: z.number().int().min(30).max(2400),
   commitment: z.string().max(2000),
   signature: z.string().max(60),
@@ -90,12 +136,22 @@ export const stateSchema = z
       .object({
         completedAt: z.number().finite().nonnegative().nullable(),
         draft: onboardingDraftSchema.nullable(),
+        commitments: z.array(seasonCommitmentSchema).max(1000).default([]),
+        acceptedProposalIds: z.array(id).max(1000).default([]),
+        history: z.array(onboardingDraftSchema).max(100).default([]),
       })
-      .default({ completedAt: null, draft: null }),
+      .default({
+        completedAt: null,
+        draft: null,
+        commitments: [],
+        acceptedProposalIds: [],
+        history: [],
+      }),
     season: z
       .object({ title: text, start: dateKeySchema, end: dateKeySchema })
       .refine((s) => s.end >= s.start, 'Season must end after it starts'),
     goals: z.array(goalSchema).max(100),
+    supportAreas: z.array(supportAreaSchema).max(100).default([]),
     tasks: z.array(taskSchema).max(5000),
     blocks: z.array(blockSchema).max(10000),
     sessions: z.array(sessionSchema).max(20000),
@@ -126,9 +182,23 @@ export const stateSchema = z
     }),
   })
   .superRefine((s, ctx) => {
-    for (const key of ['goals', 'tasks', 'blocks', 'sessions', 'reflections'] as const)
+    for (const key of [
+      'goals',
+      'supportAreas',
+      'tasks',
+      'blocks',
+      'sessions',
+      'reflections',
+    ] as const)
       if (new Set(s[key].map((x) => x.id)).size !== s[key].length)
         ctx.addIssue({ code: 'custom', message: `Duplicate ${key} IDs` });
+    if (
+      new Set(s.onboarding.commitments.map((commitment) => commitment.id)).size !==
+      s.onboarding.commitments.length
+    )
+      ctx.addIssue({ code: 'custom', message: 'Duplicate commitment IDs' });
+    if (new Set(s.onboarding.acceptedProposalIds).size !== s.onboarding.acceptedProposalIds.length)
+      ctx.addIssue({ code: 'custom', message: 'Duplicate accepted proposal IDs' });
     const sorted = [...s.blocks].sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start);
     for (let i = 1; i < sorted.length; i++) {
       const a = sorted[i - 1],
@@ -137,7 +207,17 @@ export const stateSchema = z
         ctx.addIssue({ code: 'custom', message: 'Calendar blocks overlap' });
     }
     const goals = new Set(s.goals.map((g) => g.id)),
-      tasks = new Set(s.tasks.map((t) => t.id));
+      tasks = new Set(s.tasks.map((t) => t.id)),
+      areas = new Set(s.supportAreas.map((area) => area.id));
+    for (const item of [...s.tasks, ...s.blocks, ...s.sessions, ...(s.timer ? [s.timer] : [])]) {
+      if (item.goalId && item.areaId)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Work can belong to a goal or support area, not both',
+        });
+      if (item.areaId && !areas.has(item.areaId))
+        ctx.addIssue({ code: 'custom', message: 'Unknown support area reference' });
+    }
     for (const item of [...s.tasks, ...s.blocks, ...s.sessions, ...(s.timer ? [s.timer] : [])])
       if (item.goalId && !goals.has(item.goalId))
         ctx.addIssue({ code: 'custom', message: 'Unknown goal reference' });

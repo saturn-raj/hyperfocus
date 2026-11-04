@@ -1,47 +1,72 @@
-import { SeasonSetup } from '../onboarding/SeasonSetup';
-import { BrainDump } from '../onboarding/BrainDump';
-import { GoalDetails } from '../onboarding/GoalDetails';
-import { Capacity } from '../onboarding/Capacity';
-import { Review } from '../onboarding/Review';
-import { Commitment } from '../onboarding/Commitment';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowRight,
   Check,
-  Compass,
-  Focus,
-  CalendarDays,
   Sparkles,
   ShieldCheck,
-  ArrowUpRight,
+  Compass,
+  CalendarDays,
+  Focus,
+  X,
 } from 'lucide-react';
-import { useStore, saveOnboardingDraft, completeOnboarding, replaceState } from '../useWorkspace';
-import { createState } from '../../domain/seed';
-import { addDays, type OnboardingDraft, type OnboardingGoal } from '../../domain/model';
 import {
-  createOnboardingDraft,
-  goalsFromBrainDump,
-  suggestedCommitment,
-  validateOnboardingStep,
-} from '../../domain/onboarding';
+  useStore,
+  saveOnboardingDraft,
+  completeOnboarding,
+  cancelOnboarding,
+  replaceState,
+  planning,
+} from '../useWorkspace';
+import { createState } from '../../domain/seed';
+import { addDays, uid, onboardingDraftSchema, type OnboardingDraft } from '../../domain/model';
+import { createOnboardingDraft, validateOnboardingStep } from '../../domain/onboarding';
+import type { CoachingStatus } from '../../domain/coach';
+import { SeasonSetup } from '../onboarding/SeasonSetup';
+import { Narrative } from '../onboarding/Narrative';
+import { Conversation } from '../onboarding/Conversation';
+import { PlanReview } from '../onboarding/PlanReview';
+import { Commitment } from '../onboarding/Commitment';
+import '../onboarding/styles.css';
 const chapters = [
-  'Welcome',
+  'A little clarity',
   'Your season',
-  'Make space',
-  'Find direction',
-  'Keep it real',
+  'Your story',
+  'A few questions',
   'Your plan',
-  'Your promise',
+  'Your commitment',
 ];
+function resume(
+  draft: OnboardingDraft | null,
+  state: ReturnType<typeof useStore>,
+): OnboardingDraft {
+  if (!draft) return createOnboardingDraft(state);
+  if (draft.revisionId === 'legacy')
+    return onboardingDraftSchema.parse({
+      ...draft,
+      revisionId: uid(),
+      step: Math.min(draft.step, 2),
+    });
+  return draft;
+}
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const state = useStore();
-  const [draft, setDraft] = useState<OnboardingDraft>(
-    () => state.onboarding.draft ?? createOnboardingDraft(state),
-  );
-  const [error, setError] = useState(''),
-    [activeGoal, setActiveGoal] = useState(0),
-    [suggestion, setSuggestion] = useState('');
-  const heading = useRef<HTMLHeadingElement>(null);
+  const [draft, setDraft] = useState(() => resume(state.onboarding.draft, state)),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(''),
+    [status, setStatus] = useState<CoachingStatus>({ configured: false, provider: null });
+  const heading = useRef<HTMLHeadingElement>(null),
+    request = useRef<AbortController | null>(null),
+    requestId = useRef(0);
+  useEffect(() => {
+    let live = true;
+    void planning.status().then((next) => {
+      if (live) setStatus(next);
+    });
+    return () => {
+      live = false;
+      request.current?.abort();
+    };
+  }, []);
   function persist(next: OnboardingDraft) {
     try {
       saveOnboardingDraft(next);
@@ -53,52 +78,128 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       return false;
     }
   }
-  function patch(next: Partial<OnboardingDraft>) {
-    persist({ ...draft, ...next });
+  function move(next: OnboardingDraft) {
+    if (persist(next)) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      requestAnimationFrame(() => heading.current?.focus());
+    }
   }
-  function goalPatch(id: string, next: Partial<OnboardingGoal>) {
-    const goals = draft.goals.map((g) => (g.id === id ? { ...g, ...next } : g));
-    patch({
-      goals,
-      ...(next.title !== undefined ? { brainDump: goals.map((g) => g.title).join('\n') } : {}),
+  function patch(changes: Partial<OnboardingDraft>) {
+    const planChanged = changes.goals !== undefined || changes.proposedSupportAreas !== undefined;
+    const narrativeChanged =
+      changes.brainDump !== undefined && changes.brainDump !== draft.brainDump;
+    const modeChanged = changes.coachMode !== undefined && changes.coachMode !== draft.coachMode;
+    persist({
+      ...draft,
+      ...changes,
+      ...(planChanged ? { revisionId: uid(), commitment: '', signature: '' } : {}),
+      ...(narrativeChanged || modeChanged
+        ? {
+            revisionId: uid(),
+            questions: [],
+            questionIndex: 0,
+            proposalGenerated: false,
+            commitment: '',
+            signature: '',
+          }
+        : {}),
     });
   }
-  function next(event?: FormEvent) {
-    event?.preventDefault();
+  async function generate(kind: 'questions' | 'proposal' | 'commitment', input = draft) {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const token = ++requestId.current;
+    setBusy(kind);
+    setError('');
+    try {
+      const next = await planning.forMode(input.coachMode)[kind](input, controller.signal);
+      if (controller.signal.aborted || token !== requestId.current) return;
+      move(next);
+    } catch (e) {
+      if (!controller.signal.aborted && token === requestId.current)
+        setError(
+          e instanceof Error
+            ? e.message
+            : 'The coach could not finish this step. Your answers are saved.',
+        );
+    } finally {
+      if (token === requestId.current) setBusy('');
+    }
+  }
+  function next(e?: FormEvent) {
+    e?.preventDefault();
     const problem = validateOnboardingStep(draft);
     if (problem) {
-      if (draft.step === 3) {
-        const index = draft.goals.findIndex(
-          (g) => !g.title.trim() || !g.why.trim() || !g.success.trim() || !g.firstAction.trim(),
-        );
-        if (index >= 0) setActiveGoal(index);
-      }
       setError(problem);
       return;
     }
-    try {
-      let updated = { ...draft, step: Math.min(6, draft.step + 1) };
-      if (draft.step === 2) {
-        updated = { ...updated, goals: goalsFromBrainDump(draft.brainDump, draft.goals) };
-        setActiveGoal(0);
-      }
-      if (draft.step === 5 && !draft.commitment.trim())
-        updated = { ...updated, commitment: suggestedCommitment(draft) };
-      if (persist(updated)) {
-        window.scrollTo({ top: 0, behavior: 'instant' });
-        requestAnimationFrame(() => heading.current?.focus());
-      }
-    } catch (e) {
-      setError((e as Error).message);
+    if (draft.step === 2) {
+      if (draft.questions.length) move({ ...draft, step: 3 });
+      else void generate('questions');
+      return;
     }
+    if (draft.step === 4) {
+      if (draft.commitment.trim()) move({ ...draft, step: 5 });
+      else void generate('commitment');
+      return;
+    }
+    move({ ...draft, step: draft.step + 1 });
+  }
+  function answer(text: string) {
+    const question = draft.questions[draft.questionIndex];
+    if (!question) return;
+    const existing = draft.answers.find((a) => a.questionId === question.id);
+    persist({
+      ...draft,
+      answers: [
+        ...draft.answers.filter((a) => a.questionId !== question.id),
+        { questionId: question.id, prompt: question.prompt, answer: text },
+      ],
+      ...(existing?.answer !== text
+        ? { revisionId: uid(), proposalGenerated: false, commitment: '', signature: '' }
+        : {}),
+    });
+  }
+  function answerNext(skip = false, e?: FormEvent) {
+    e?.preventDefault();
+    const question = draft.questions[draft.questionIndex];
+    if (!question) return;
+    const record = draft.answers.find((a) => a.questionId === question.id);
+    if (!skip && !record?.answer.trim()) {
+      setError('Share a little context, or choose Skip this question.');
+      return;
+    }
+    const updated = skip
+      ? {
+          ...draft,
+          answers: [
+            ...draft.answers.filter((a) => a.questionId !== question.id),
+            { questionId: question.id, prompt: question.prompt, answer: '' },
+          ],
+          proposalGenerated: false,
+        }
+      : draft;
+    if (draft.questionIndex < draft.questions.length - 1)
+      move({ ...updated, questionIndex: draft.questionIndex + 1 });
+    else if (updated.proposalGenerated) move({ ...updated, step: 4 });
+    else void generate('proposal', updated);
+  }
+  function stop() {
+    request.current?.abort();
+    requestId.current++;
+    setBusy('');
+    setError('');
+  }
+  function goBack() {
+    stop();
+    if (draft.step === 3 && draft.questionIndex > 0)
+      move({ ...draft, questionIndex: draft.questionIndex - 1 });
+    else move({ ...draft, step: Math.max(0, draft.step - 1) });
   }
   function finish(e: FormEvent) {
     e.preventDefault();
-    const problem = validateOnboardingStep(draft);
-    if (problem) {
-      setError(problem);
-      return;
-    }
+    if (busy) return;
     try {
       completeOnboarding(draft);
       onComplete();
@@ -106,221 +207,175 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       setError((e as Error).message);
     }
   }
-  function goBack() {
-    if (persist({ ...draft, step: Math.max(0, draft.step - 1) })) {
-      setSuggestion('');
-      requestAnimationFrame(() => heading.current?.focus());
+  function cancel() {
+    stop();
+    try {
+      cancelOnboarding();
+      onComplete();
+    } catch (e) {
+      setError((e as Error).message);
     }
   }
-  const total = draft.goals.reduce((sum, g) => sum + g.weeklyMinutes, 0),
-    end = addDays(draft.start, draft.lengthDays - 1),
-    core = draft.goals.find((g) => g.priority === 'core');
-  const goal = draft.goals[Math.min(activeGoal, Math.max(0, draft.goals.length - 1))];
-  const coachNote =
-    draft.step === 1
-      ? 'A season gives your ambitions a finish line. You can adjust it later.'
-      : draft.step === 2
-        ? 'Write freely. Start with what you want to change, build, learn, or make time for.'
-        : draft.step === 3
-          ? `“${goal?.title ?? 'Your goal'}” deserves a clear finish line. What would make you proud of the progress?`
-          : draft.step === 4
-            ? 'A plan is only useful if it fits the life you actually have. Leave some room for being human.'
-            : draft.step === 5
-              ? 'You made the choices. Here is how they fit together. Adjust anything that doesn’t feel right.'
-              : 'This is a note to the version of you who will need a little encouragement a few weeks from now.';
-  const stepProps = {
-    draft,
-    heading,
-    next,
-    patch,
-    end,
-    goBack,
-    goal,
-    activeGoal,
-    setActiveGoal,
-    goalPatch,
-    setError,
-    total,
-    core,
-    finish,
-    setSuggestion,
-    suggestion,
-  };
+  const end = addDays(draft.start, draft.lengthDays - 1);
+  const shared = { draft, heading, next, finish, goBack, patch, end };
   return (
-    <div className={`onboarding-shell ${draft.step === 0 ? 'onboarding-welcome' : ''}`}>
+    <div className="onboarding-shell season-onboarding">
       <header className="onboarding-header">
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            if (draft.step) goBack();
-          }}
-          aria-label="Hyperfocus setup"
-        >
+        <a className="brand" href="#" onClick={(e) => e.preventDefault()}>
           <span className="brand-mark">h</span>
           <span>
             hyperfocus<span className="brand-period">.</span>
           </span>
         </a>
-        <div className="onboarding-saved">
-          <ShieldCheck size={14} />
-          <span>
-            {state.onboarding.draft
-              ? 'Progress saved on this device'
-              : 'A little space, just for you'}
+        <div className="setup-header-right">
+          <span className="onboarding-saved">
+            <ShieldCheck size={14} />
+            {draft.coachMode === 'guided'
+              ? 'Private guided mode'
+              : `Coach · ${status.provider ?? 'connected'}`}
           </span>
+          {state.onboarding.completedAt !== null ? (
+            <button
+              className="icon-button"
+              aria-label="Return to my current season"
+              onClick={cancel}
+            >
+              <X size={18} />
+            </button>
+          ) : null}
         </div>
       </header>
       {draft.step === 0 ? (
-        <main className="onboarding-intro">
-          <div className="onboarding-intro-copy">
-            <div className="onboarding-eyebrow">
-              <span /> LESS BUSY. MORE MEANINGFUL.
+        <main className="setup-welcome">
+          <span className="setup-kicker">MAKE THE NEXT CHAPTER COUNT</span>
+          <h1 ref={heading} tabIndex={-1}>
+            A lot on your mind.
+            <br />
+            Let’s find <em>your focus.</em>
+          </h1>
+          <p>
+            Make a little space to decide what deserves this season. A few meaningful intentions can
+            give the next chapter a direction.
+          </p>
+          <p>
+            Tell us what’s on your mind. We’ll ask a few questions, shape a plan together, and give
+            your intentions somewhere to land.
+          </p>
+          <button className="button primary setup-start" onClick={() => next()}>
+            Plan my season <ArrowRight size={18} />
+          </button>
+          <span className="setup-time">About five minutes. Progress saves as you go.</span>
+          <div className="setup-rhythm">
+            <div>
+              <Compass size={23} />
+              <strong>Find your direction</strong>
+              <span>A season built around what matters.</span>
             </div>
-            <h1 ref={heading} tabIndex={-1}>
-              Before you plan your week,
-              <br />
-              make room for <em>yourself.</em>
-            </h1>
-            <p>
-              You have things you want to do. Things you keep putting off. And probably a little too
-              much on your mind.
+            <div>
+              <CalendarDays size={23} />
+              <strong>Make room for it</strong>
+              <span>Turn intentions into realistic time.</span>
+            </div>
+            <div>
+              <Focus size={23} />
+              <strong>Follow through</strong>
+              <span>Focus, reflect, and find your rhythm.</span>
+            </div>
+          </div>
+          {state.goals.length ? (
+            <p className="setup-existing">
+              Your existing work and signed commitments are kept while you plan.
             </p>
-            <p>
-              Let’s turn all of that into a season with direction. We’ll take it one question at a
-              time.
-            </p>
-            <button className="button primary onboarding-primary" onClick={() => next()}>
-              Let’s find your focus <ArrowRight size={18} />
+          ) : (
+            <button
+              className="text-button muted"
+              onClick={() => {
+                try {
+                  replaceState(createState(true));
+                  onComplete();
+                } catch (e) {
+                  setError((e as Error).message);
+                }
+              }}
+            >
+              Explore an example workspace <ArrowRight size={13} />
             </button>
-            <span className="onboarding-time">
-              About 5 minutes. Your answers stay on this device.
-            </span>
-            {state.goals.length ? (
-              <p className="onboarding-preserve">
-                Your existing goals, calendar, and focus history will be kept.
-              </p>
-            ) : (
-              <button
-                className="text-button onboarding-demo"
-                onClick={() => {
-                  try {
-                    replaceState(createState(true));
-                    onComplete();
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
-                }}
-              >
-                Just looking around? Explore an example <ArrowUpRight size={14} />
-              </button>
-            )}
-          </div>
-          <div
-            className="onboarding-intro-art"
-            aria-label="Your goals become a season, your season becomes a plan, and your plan becomes focused progress"
-          >
-            <div className="intro-art-caption">THE BIG PICTURE</div>
-            <div className="intro-rhythm">
-              <span className="rhythm-icon">
-                <Compass size={25} />
-              </span>
-              <div>
-                <small>01 · GET CLEAR</small>
-                <h2>What really matters to you?</h2>
-                <p>A few goals for the season ahead.</p>
-              </div>
-            </div>
-            <div className="rhythm-connector" />
-            <div className="intro-rhythm">
-              <span className="rhythm-icon">
-                <CalendarDays size={25} />
-              </span>
-              <div>
-                <small>02 · MAKE ROOM</small>
-                <h2>Give it a place in your week.</h2>
-                <p>A plan that leaves space for life.</p>
-              </div>
-            </div>
-            <div className="rhythm-connector" />
-            <div className="intro-rhythm">
-              <span className="rhythm-icon">
-                <Focus size={25} />
-              </span>
-              <div>
-                <small>03 · FOLLOW THROUGH</small>
-                <h2>One good session at a time.</h2>
-                <p>Focus, reflect, and keep moving.</p>
-              </div>
-            </div>
-            <div className="intro-art-note">
-              <Sparkles size={17} />
-              <p>
-                You don’t need a perfect plan.
-                <br />
-                You need a meaningful place to start.
-              </p>
-            </div>
-          </div>
+          )}
         </main>
       ) : (
         <>
-          <nav className="onboarding-progress" aria-label="Setup progress">
+          <nav className="setup-progress" aria-label="Setup progress">
             {chapters.slice(1).map((chapter, i) => (
               <div
                 key={chapter}
                 className={draft.step === i + 1 ? 'current' : draft.step > i + 1 ? 'complete' : ''}
                 aria-current={draft.step === i + 1 ? 'step' : undefined}
               >
-                <span>
-                  {draft.step > i + 1 ? <Check size={12} /> : String(i + 1).padStart(2, '0')}
-                </span>
+                <span>{draft.step > i + 1 ? <Check size={12} /> : i + 1}</span>
                 <span>{chapter}</span>
               </div>
             ))}
           </nav>
-          <main className="onboarding-main">
-            <aside className="onboarding-coach">
-              <span className="coach-avatar">
-                <Sparkles size={22} />
-              </span>
-              <span className="onboarding-eyebrow">A LITTLE GUIDANCE</span>
-              <p>{coachNote}</p>
-              <div className="onboarding-coach-meta">
-                <span>{String(draft.step).padStart(2, '0')} / 06</span>
-                <span>{chapters[draft.step]}</span>
-              </div>
-              {draft.name ? (
-                <span className="onboarding-personal">
-                  Your pace, {draft.name}. There’s no rush.
+          <main className={`setup-main ${draft.step === 4 ? 'setup-plan-page' : ''}`}>
+            {draft.step === 1 ? (
+              <SeasonSetup {...shared} />
+            ) : draft.step === 2 ? (
+              <Narrative {...shared} status={status} busy={!!busy} />
+            ) : draft.step === 3 ? (
+              <Conversation
+                draft={draft}
+                heading={heading}
+                onAnswer={answer}
+                onNext={(e) => answerNext(false, e)}
+                onBack={goBack}
+                onSkip={() => answerNext(true)}
+                busy={!!busy}
+              />
+            ) : draft.step === 4 ? (
+              <PlanReview
+                {...shared}
+                busy={!!busy}
+                onRegenerate={() => void generate('proposal')}
+              />
+            ) : (
+              <Commitment {...shared} />
+            )}
+            {busy ? (
+              <div className="generation-status" role="status">
+                <Sparkles size={16} />
+                <span>
+                  {busy === 'questions'
+                    ? 'Finding questions for your season…'
+                    : busy === 'proposal'
+                      ? 'Putting your answers into a plan…'
+                      : 'Drafting a commitment from your plan…'}
                 </span>
-              ) : null}
-            </aside>
-            <section className="onboarding-content">
-              {draft.step === 1 ? <SeasonSetup {...stepProps} /> : null}
-              {draft.step === 2 ? <BrainDump {...stepProps} /> : null}
-              {draft.step === 3 ? <GoalDetails {...stepProps} /> : null}
-              {draft.step === 4 ? <Capacity {...stepProps} /> : null}
-              {draft.step === 5 ? <Review {...stepProps} /> : null}
-              {draft.step === 6 ? <Commitment {...stepProps} /> : null}
-              {error ? (
-                <p className="onboarding-error error" role="alert">
-                  {error}
-                </p>
-              ) : null}
-            </section>
+                <button className="text-button" onClick={stop}>
+                  Cancel
+                </button>
+              </div>
+            ) : null}
           </main>
         </>
       )}
-      {draft.step === 0 && error ? (
-        <p className="error" role="alert">
-          {error}
-        </p>
+      {error ? (
+        <div className="setup-error" role="alert">
+          <p>{error}</p>
+          {draft.coachMode === 'connected' ? (
+            <p>
+              Your answers are saved. Retry this step, or return to your story and choose private
+              guided mode.
+            </p>
+          ) : null}
+        </div>
       ) : null}
       <footer className="onboarding-footer">
         <span>A little clarity goes a long way.</span>
-        <span>Private by default. Yours from the start.</span>
+        <span>
+          {draft.step > 0
+            ? `${Math.min(draft.step, 5)} of 5 · ${chapters[Math.min(draft.step, 5)]}`
+            : 'No account. No subscription. Your season.'}
+        </span>
       </footer>
     </div>
   );

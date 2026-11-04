@@ -1,5 +1,6 @@
 import { stateSchema, type State } from '../domain/model';
 import type { Repository } from '../application/ports';
+import { migrateBackup } from '../domain/migration';
 export const STORAGE_KEY = 'hyperfocus:v1';
 export class BrowserRepository implements Repository {
   load() {
@@ -12,10 +13,12 @@ export class BrowserRepository implements Repository {
 }
 export function parseBackup(raw: string): State {
   if (raw.length > 10_000_000) throw new Error('Backup exceeds the 10 MB limit.');
-  const result = stateSchema.safeParse(JSON.parse(raw));
-  if (!result.success)
-    throw new Error(`Invalid backup: ${result.error.issues[0]?.message ?? 'unknown format'}`);
-  return result.data;
+  try {
+    return migrateBackup(JSON.parse(raw));
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    throw new Error(`Invalid backup: ${error instanceof Error ? error.message : 'unknown format'}`);
+  }
 }
 export function download(filename: string, content: string, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([content], { type }));

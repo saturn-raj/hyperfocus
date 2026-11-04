@@ -1,14 +1,19 @@
 import { useState } from 'react';
 import { Plus, ArrowUpRight, Flag, Check } from 'lucide-react';
-import { useStore, commit, saveGoal } from '../useWorkspace';
-import { hours, localDate, type Goal } from '../../domain/model';
+import { useStore, commit, saveGoal, signCommitment } from '../useWorkspace';
+import { hours, localDate, type Goal, type SupportArea } from '../../domain/model';
 import { weekMinutes } from '../../domain/planning';
 import { GoalEditor } from '../components/Editors';
+import { AreaEditor } from '../components/AreaEditor';
 import { Modal } from '../components/Modal';
 export function Season({ notify }: { notify: (s: string) => void }) {
   const s = useStore();
   const [editing, setEditing] = useState<Goal | true | null>(null),
-    [editSeason, setEditSeason] = useState(false);
+    [editSeason, setEditSeason] = useState(false),
+    [editArea, setEditArea] = useState<SupportArea | true | null>(null),
+    [editPromise, setEditPromise] = useState(false);
+  const promise = s.onboarding.commitments.at(-1),
+    notes = s.onboarding.history.at(-1);
   const today = localDate();
   const total = Math.max(
       1,
@@ -33,20 +38,41 @@ export function Season({ notify }: { notify: (s: string) => void }) {
           <Plus size={17} /> New goal
         </button>
       </div>
-      {s.onboarding.draft?.commitment && s.onboarding.completedAt ? (
+      {promise ? (
         <section className="season-commitment">
           <Flag size={21} />
           <div>
             <div className="eyebrow">YOUR SEASON STARTS WITH A PROMISE</div>
-            <p>{s.onboarding.draft.commitment}</p>
+            <p>{promise.text}</p>
             <small>
-              Signed {s.onboarding.draft.signature} ·{' '}
-              {new Date(s.onboarding.completedAt).toLocaleDateString(undefined, {
+              Signed {promise.signature} ·{' '}
+              {new Date(promise.signedAt).toLocaleDateString(undefined, {
                 month: 'long',
                 day: 'numeric',
                 year: 'numeric',
-              })}
+              })}{' '}
+              · Revision {promise.revision}
             </small>
+            <button className="text-button" onClick={() => setEditPromise(true)}>
+              Edit and re-sign my commitment
+            </button>
+            {s.onboarding.commitments.length > 1 ? (
+              <details className="commitment-history">
+                <summary>Previous commitments</summary>
+                {s.onboarding.commitments
+                  .slice(0, -1)
+                  .reverse()
+                  .map((c) => (
+                    <article key={c.id}>
+                      <p>{c.text}</p>
+                      <small>
+                        {c.signature} · {new Date(c.signedAt).toLocaleDateString()} · Revision{' '}
+                        {c.revision}
+                      </small>
+                    </article>
+                  ))}
+              </details>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -95,7 +121,7 @@ export function Season({ notify }: { notify: (s: string) => void }) {
                     ? 'Core focus'
                     : g.priority === 'secondary'
                       ? 'Secondary focus'
-                      : 'Support area'}
+                      : 'Supporting goal (legacy)'}
                 </span>
                 <button
                   className="icon-button"
@@ -163,6 +189,102 @@ export function Season({ notify }: { notify: (s: string) => void }) {
           <span>Give a meaningful goal a place in this season.</span>
         </button>
       </div>
+      <section className="season-areas">
+        <div className="label-row">
+          <div>
+            <h2>Support areas</h2>
+            <p className="hint">Ongoing care for the life around your goals.</p>
+          </div>
+          <button className="button small" onClick={() => setEditArea(true)}>
+            <Plus size={15} />
+            Add support area
+          </button>
+        </div>
+        <div className="area-grid">
+          {s.supportAreas.map((a) => (
+            <article key={a.id} className={`area-card ${a.color}`}>
+              <div className="label-row">
+                <h3>
+                  <span className="goal-dot" /> {a.title}
+                </h3>
+                <button
+                  className="icon-button"
+                  aria-label={`Edit area ${a.title}`}
+                  onClick={() => setEditArea(a)}
+                >
+                  <ArrowUpRight size={17} />
+                </button>
+              </div>
+              <p>{a.description || 'An ongoing area of life to keep looking after.'}</p>
+            </article>
+          ))}
+        </div>
+        {!s.supportAreas.length ? (
+          <p className="empty-small">
+            Add an area for ongoing responsibilities, health, or relationships. Areas stay separate
+            from seasonal outcomes.
+          </p>
+        ) : null}
+      </section>
+      {notes ? (
+        <details className="planning-notes">
+          <summary>Your planning notes and original answers</summary>
+          <p>{notes.brainDump}</p>
+          {notes.answers.map((answer) => (
+            <div key={answer.questionId}>
+              <strong>{answer.prompt}</strong>
+              <p>{answer.answer || 'Skipped'}</p>
+            </div>
+          ))}
+        </details>
+      ) : null}
+      {editArea ? (
+        <AreaEditor
+          area={editArea === true ? undefined : editArea}
+          onClose={() => setEditArea(null)}
+        />
+      ) : null}
+      {editPromise && promise ? (
+        <Modal
+          title="A commitment worth coming back to"
+          description="Edit your words and sign a new revision. Your earlier signed commitments stay in the history."
+          onClose={() => setEditPromise(false)}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const data = new FormData(e.currentTarget);
+              try {
+                signCommitment(String(data.get('commitment')), String(data.get('signature')));
+                setEditPromise(false);
+                notify('Your new commitment is signed.');
+              } catch (e) {
+                notify((e as Error).message);
+              }
+            }}
+          >
+            <label>
+              Your commitment
+              <textarea
+                aria-label="Your commitment"
+                name="commitment"
+                required
+                maxLength={2000}
+                rows={6}
+                defaultValue={promise.text}
+              />
+            </label>
+            <label>
+              Signed
+              <input name="signature" required maxLength={60} defaultValue={promise.signature} />
+            </label>
+            <div className="modal-actions">
+              <span />
+              <button className="button primary">Sign new revision</button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
       {editing ? (
         <GoalEditor
           goal={editing === true ? undefined : editing}

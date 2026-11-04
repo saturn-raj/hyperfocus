@@ -31,6 +31,7 @@ export function Commitment({
         <label>
           Your commitment
           <textarea
+            aria-label="Your commitment"
             required
             rows={5}
             maxLength={2000}

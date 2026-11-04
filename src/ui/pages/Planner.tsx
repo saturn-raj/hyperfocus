@@ -48,6 +48,9 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
     (b) => b.date >= monday(anchor) && b.date < addDays(monday(anchor), 7),
   );
   const scheduled = week.reduce((sum, b) => sum + b.duration, 0),
+    goalScheduled = week
+      .filter((block) => block.goalId !== null)
+      .reduce((sum, block) => sum + block.duration, 0),
     target = s.goals.reduce((sum, g) => sum + g.weeklyMinutes, 0);
   const tasks = s.tasks.filter((t) => !t.done);
   const recs = recommendations(s, anchor);
@@ -61,6 +64,11 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
         .filter((b) => days.includes(b.date))
         .map((b) => Math.ceil((b.start + b.duration) / 60)),
     );
+  function workTarget(item: { goalId: string | null; areaId?: string | null }) {
+    return item.goalId
+      ? s.goals.find((goal) => goal.id === item.goalId)
+      : s.supportAreas.find((area) => area.id === item.areaId);
+  }
   function run(action: () => void) {
     try {
       action();
@@ -126,7 +134,7 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
             <p className="hint">Drag a task into your week, or choose a time.</p>
             <div className="task-list">
               {tasks.map((t) => {
-                const goal = s.goals.find((g) => g.id === t.goalId),
+                const goal = workTarget(t),
                   isScheduled = s.blocks.some((b) => b.taskId === t.id && !b.done);
                 return (
                   <div
@@ -308,7 +316,7 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
                     {s.blocks
                       .filter((b) => b.date === d)
                       .map((b) => {
-                        const goal = s.goals.find((g) => g.id === b.goalId);
+                        const goal = workTarget(b);
                         return (
                           <div
                             key={b.id}
@@ -326,11 +334,13 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
                             <button
                               className="block-content"
                               aria-label={`Edit ${b.title}`}
+                              title={goal ? `${b.title} · ${goal.title}` : b.title}
                               onClick={() => setEditingBlock({ block: b })}
                             >
                               <span>{b.title}</span>
                               {b.duration > 30 ? (
                                 <small>
+                                  {b.areaId ? `${goal?.title ?? 'Support area'} · ` : ''}
                                   {clock(b.start)} – {clock(b.start + b.duration)}
                                 </small>
                               ) : null}
@@ -341,7 +351,13 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
                                 aria-label={`Focus on ${b.title}`}
                                 onClick={() =>
                                   run(() => {
-                                    startFocus(b.title, b.duration, b.goalId, b.taskId);
+                                    startFocus(
+                                      b.title,
+                                      b.duration,
+                                      b.goalId,
+                                      b.taskId,
+                                      b.areaId ?? null,
+                                    );
                                     onFocus();
                                   })
                                 }
@@ -377,7 +393,7 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
               <span className="status-dot" /> {hours(scheduled)} planned this week
             </span>
             <span>
-              {hours(Math.max(0, target - scheduled))} of goal time still to make room for
+              {hours(Math.max(0, target - goalScheduled))} of goal time still to make room for
             </span>
           </div>
         </section>
@@ -420,9 +436,15 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
             <div className="agenda-row" key={b.id}>
               <time>{clock(b.start)}</time>
               <span
-                className={`goal-dot ${s.goals.find((g) => g.id === b.goalId)?.color ?? 'neutral'}`}
+                className={`goal-dot ${workTarget(b)?.color ?? 'neutral'}`}
+                title={workTarget(b)?.title}
               />
               <span className={b.done ? 'struck' : ''}>{b.title}</span>
+              {b.areaId ? (
+                <small className={`goal-tag ${workTarget(b)?.color ?? 'neutral'}`}>
+                  {workTarget(b)?.title ?? 'Support area'}
+                </small>
+              ) : null}
               <small>{hours(b.duration)}</small>
               <button
                 className="icon-button"
@@ -435,7 +457,7 @@ export function Planner({ notify, onFocus }: { notify: (s: string) => void; onFo
                 className="button small"
                 onClick={() =>
                   run(() => {
-                    startFocus(b.title, b.duration, b.goalId, b.taskId);
+                    startFocus(b.title, b.duration, b.goalId, b.taskId, b.areaId ?? null);
                     onFocus();
                   })
                 }

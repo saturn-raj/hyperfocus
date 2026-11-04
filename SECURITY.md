@@ -1,9 +1,11 @@
 # Security
 
-| Topic             | Guidance                                                                                                                                                                            |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local data        | Browser storage contains unencrypted goals, reflections and focus history. Treat backups as private documents. Other users of the same browser profile can access them.             |
-| Browser extension | Broad host permissions enable navigation blocking. Rules do not read page content. Review the extension source and its documented trusted origins before installation.              |
-| Self-hosting      | Serve only trusted assets over HTTPS. Keep the site origin stable. Add authentication and a threat model before adding remote storage or a server API.                              |
-| Reporting         | Use the repository's private vulnerability-reporting feature if available. Otherwise open an issue asking for a private contact without disclosing exploit details or private data. |
-| Dependencies      | Run `npm audit` and evaluate tooling advisories separately from production runtime dependencies.                                                                                    |
+| Topic              | Guidance                                                                                                                                                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Local data         | Goals, answers, commitments, reflections and focus history are unencrypted in the browser profile. Treat exported backups as private documents.                                                                    |
+| Connected coaching | Opt-in mode sends planning context to the configured provider. Keep credentials in ignored server-side `.env` settings. The app does not log personal answers or provider keys. Provider retention policies apply. |
+| Local API          | The Node server binds to `127.0.0.1` and rejects foreign/cross-site coaching origins. It has no accounts, public-user authorization or billing quotas. Add those before designing a remote multi-user deployment.  |
+| Static hosting     | Deploy trusted built assets over HTTPS and keep the origin stable. Static mode cannot call an unconfigured remote coaching API.                                                                                    |
+| Browser companion  | Broad host permissions enable navigation blocking. No browsing history or page content is read. Review its trusted planner origins before installation.                                                            |
+| Reporting          | Use GitHub private vulnerability reporting if available. Otherwise ask for a private contact in an issue without publishing exploit details or private data.                                                       |
+| Dependencies       | Check runtime and tooling advisories separately. No third-party reverse-engineered code or personal onboarding captures belong in pull requests.                                                                   |

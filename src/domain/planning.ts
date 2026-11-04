@@ -66,6 +66,7 @@ export function draftWeek(s: State, date: string): Block[] {
           id: crypto.randomUUID(),
           taskId: task.id,
           goalId: task.goalId,
+          areaId: task.areaId ?? null,
           title: task.title,
           date: d,
           start: minute,

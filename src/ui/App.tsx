@@ -56,7 +56,7 @@ export function App() {
   }, []);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (!s.onboarding.completedAt) return;
+      if (s.onboarding.completedAt === null) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setSearch((v) => !v);
@@ -97,7 +97,11 @@ export function App() {
     const interval = setInterval(send, 2000);
     return () => clearInterval(interval);
   }, [s.timer, s.settings.blockedDomains]);
-  if (!s.onboarding.completedAt && !getStartupError()) {
+  if (
+    (s.onboarding.completedAt === null ||
+      (s.onboarding.draft && s.onboarding.draft.revisionId !== 'legacy')) &&
+    !getStartupError()
+  ) {
     return (
       <Suspense
         fallback={

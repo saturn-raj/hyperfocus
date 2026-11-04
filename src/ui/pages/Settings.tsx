@@ -194,7 +194,13 @@ export function Settings({ notify }: { notify: (s: string) => void }) {
                   run(() =>
                     replaceState({
                       ...createState(false),
-                      onboarding: { completedAt: Date.now(), draft: null },
+                      onboarding: {
+                        completedAt: Date.now(),
+                        draft: null,
+                        commitments: [],
+                        acceptedProposalIds: [],
+                        history: [],
+                      },
                     }),
                   );
               }}
@@ -226,7 +232,9 @@ export function Settings({ notify }: { notify: (s: string) => void }) {
           >
             Source code & documentation <ExternalLink size={14} />
           </a>
-          <p className="hint">No telemetry. No remote AI calls. No hidden services.</p>
+          <p className="hint">
+            No telemetry. Connected coaching is optional and uses your server-configured provider.
+          </p>
         </section>
       </div>
     </>
