@@ -16,7 +16,7 @@ async function answerGuided(page: Page) {
     page.getByRole('heading', { name: /If only one thing moved forward/ }),
   ).toBeVisible();
   let count = 0;
-  while (await page.getByLabel('Your answer', { exact: true }).count()) {
+  while (await page.locator('.question-track').count()) {
     if (count++ > 10) throw new Error('Too many follow-ups');
     const text = await page.locator('h1').innerText();
     const answer = /maintaining|maintain/i.test(text)
@@ -26,11 +26,14 @@ async function answerGuided(page: Page) {
         : /only one/i.test(text)
           ? 'Launching the open-source planner is the most meaningful outcome.'
           : 'A small useful release, three interviews, and a steady routine would count as progress.';
+    if (!(await page.getByLabel('Your answer', { exact: true }).count()))
+      await page.getByRole('button', { name: 'Write my own answer', exact: true }).click();
     await page.getByLabel('Your answer', { exact: true }).fill(answer);
     if (count === 1) {
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
       await page.reload();
-      await expect(page.getByLabel('Your answer', { exact: true })).toHaveValue('');
+      await expect(page.getByRole('group', { name: 'Suggested answers' })).toBeVisible();
+      await expect(page.getByLabel('Your answer', { exact: true })).not.toBeAttached();
       await expect(page.getByRole('heading', { name: /concrete result/ })).toBeVisible();
       continue;
     }

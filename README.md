@@ -13,7 +13,7 @@ Open **http://127.0.0.1:5180**. Requires Node.js **22.12+**. New workspaces star
 
 | Area          | Included                                                                                                                                                                                                               |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Onboarding    | Season dates → free-form narrative → relevant follow-up questions one at a time → editable plan → editable commitment and signature. Resumes at the current question.                                                  |
+| Onboarding    | Season dates → free-form narrative → relevant follow-up questions with selectable answers and custom input → editable plan → editable commitment and signature. Resumes at the current question.                       |
 | Goal review   | Add, remove and edit outcomes; choose a core priority; adjust weekly time, finish lines and first actions. Original answers remain separate from plan edits.                                                           |
 | Support areas | Distinct ongoing areas such as health, home and relationships. Area tasks can be scheduled and focused without becoming seasonal goals.                                                                                |
 | Coaching      | Private guided mode uses explicit local heuristics. Connected mode uses your server-configured OpenAI-compatible provider or local Ollama. Nothing is sent to a provider until you choose connected mode and continue. |

@@ -1,3 +1,4 @@
+import { guidedAnswerChoices, narrativeIntentions } from '../domain/answer-choices';
 import type { PlanningCoach } from '../application/coach-port';
 import type { CoachingContext, CoachingPlan, CoachingQuestion } from '../domain/coach';
 /** Explicit, local heuristics. This adapter never represents itself as a language model. */
@@ -47,21 +48,14 @@ export class GuidedCoach implements PlanningCoach {
           'What needs maintaining while you pursue these goals? Think health, relationships, home, admin, and time to rest.',
       },
     );
-    return questions.slice(0, 7);
+    return questions.slice(0, 7).map((question) => ({
+      ...question,
+      options: guidedAnswerChoices(question.id, context.brainDump),
+    }));
   }
   async plan(context: CoachingContext): Promise<CoachingPlan> {
     const raw = context.brainDump.replace(/\r/g, '');
-    const pieces = raw
-      .split(
-        /\n+|[.;](?:\s+|$)|\s+(?:and (?:I |i )?(?:want|need|plan|hope) to|also (?:I |i )?(?:want|need) to)\s+/,
-      )
-      .map((t) =>
-        t
-          .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '')
-          .replace(/^(?:I (?:want|need|plan|hope|would like) to|I'd like to)\s+/i, '')
-          .trim(),
-      )
-      .filter((t) => t.length >= 5);
+    const pieces = narrativeIntentions(raw);
     const maintenance = pieces.filter(
       (t) =>
         /maintain|keep|look after/i.test(t) &&

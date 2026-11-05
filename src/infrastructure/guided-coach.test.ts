@@ -30,6 +30,24 @@ describe('explicit local guided coaching', () => {
     expect(coachingQuestionsSchema.safeParse({ questions: health }).success).toBe(true);
     expect(network).not.toHaveBeenCalled();
   });
+  it('supplies usable choices for every generated question, including goals from the narrative', async () => {
+    const input = context(
+      'Launch a useful product\nInterview at three companies\nPost on Twitter daily\nPublish Instagram videos',
+    );
+    const questions = await new GuidedCoach().questions(input);
+    expect(questions.every((q) => (q.options?.length ?? 0) >= 2)).toBe(true);
+    expect(questions.find((q) => q.id === 'north-star')?.options).toEqual([
+      'Launch a useful product',
+      'Interview at three companies',
+      'Post on Twitter daily',
+      'Publish Instagram videos',
+    ]);
+    expect(questions.find((q) => q.id === 'create')?.options).toEqual(
+      expect.arrayContaining(['Post on Twitter daily', 'Publish an Instagram video daily']),
+    );
+    expect(questions.find((q) => q.id === 'capacity')?.options).toContain('About 5 hours a week');
+    expect(coachingQuestionsSchema.safeParse({ questions }).success).toBe(true);
+  });
   it('keeps four outcomes as core or secondary and builds maintenance areas separately', async () => {
     const input = context(
       'Launch a useful product\nFind a new role\nPublish helpful essays\nFinish a local race',

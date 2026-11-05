@@ -150,8 +150,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     const question = draft.questions[draft.questionIndex];
     if (!question) return;
     const existing = draft.answers.find((a) => a.questionId === question.id);
+    const capacity = question.id === 'capacity' ? /^About (\d+) hours a week$/.exec(text) : null;
     persist({
       ...draft,
+      ...(capacity ? { weeklyCapacity: Number(capacity[1]) * 60 } : {}),
       answers: [
         ...draft.answers.filter((a) => a.questionId !== question.id),
         { questionId: question.id, prompt: question.prompt, answer: text },

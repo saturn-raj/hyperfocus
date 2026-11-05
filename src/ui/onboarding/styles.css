@@ -1239,3 +1239,102 @@
     font-size: 10px;
   }
 }
+.answer-choice-section {
+  margin: 26px 0 12px;
+}
+.answer-choice-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 13px;
+}
+.answer-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 0;
+}
+.answer-options > button {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 55px;
+  padding: 15px 17px;
+  width: 100%;
+  background: #10161e;
+  border-color: #303742;
+  font-size: 14px;
+  line-height: 1.7;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.answer-options > button:hover {
+  border-color: #64748d;
+  background: #141e2b;
+}
+.answer-options > button.selected {
+  border-color: #9bb4de;
+  background: #18283e;
+}
+.choice-indicator {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 1px solid #647084;
+  border-radius: 50%;
+  color: #0c1117;
+}
+.multiple .choice-indicator {
+  border-radius: 5px;
+}
+.selected .choice-indicator {
+  background: #c1d5f4;
+  border-color: #c1d5f4;
+}
+.custom-answer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #b4bdcc;
+  padding: 15px 2px;
+  margin-top: 4px;
+}
+.custom-answer-toggle:hover,
+.custom-answer-toggle.active {
+  color: #e5e7eb;
+}
+.answer-choice-section + .answer-label {
+  margin-top: 8px;
+}
+.answer-choice-section + .answer-label textarea {
+  min-height: 125px;
+}
+@media (max-width: 650px) {
+  .answer-choice-hint {
+    font-size: 10px;
+  }
+  .answer-options > button {
+    font-size: 12px;
+    min-height: 53px;
+    padding: 14px;
+    gap: 11px;
+  }
+  .choice-indicator {
+    width: 19px;
+    height: 19px;
+  }
+  .custom-answer-toggle {
+    font-size: 11px;
+    min-height: 44px;
+  }
+  .answer-choice-section {
+    margin-top: 22px;
+  }
+  .answer-choice-section + .answer-label textarea {
+    font-size: 13px;
+    min-height: 130px;
+  }
+}
